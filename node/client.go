@@ -8,6 +8,7 @@ import (
 )
 
 type Client struct {
+	url string
 	*providers.MiddlewarableProvider
 }
 
@@ -23,8 +24,13 @@ func NewClient(url string, option ...providers.Option) (*Client, error) {
 	}
 
 	return &Client{
+		url:                   url,
 		MiddlewarableProvider: provider,
 	}, nil
+}
+
+func (c *Client) URL() string {
+	return c.url
 }
 
 // Ionian RPCs

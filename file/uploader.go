@@ -64,9 +64,8 @@ func (opt *UploadOption) NewIonian() (*contract.Ionian, error) {
 }
 
 type Uploader struct {
-	filename string
-	ionian   *contract.Ionian
-	client   *node.Client
+	ionian *contract.Ionian
+	client *node.Client
 }
 
 func NewUploader(opt UploadOption) (*Uploader, error) {
@@ -81,15 +80,28 @@ func NewUploader(opt UploadOption) (*Uploader, error) {
 	}
 
 	return &Uploader{
-		filename: opt.Filename,
-		ionian:   ionian,
-		client:   client,
+		ionian: ionian,
+		client: client,
 	}, nil
 }
 
-func (uploader *Uploader) Upload() error {
+func NewUploaderLight(client *node.Client) *Uploader {
+	return &Uploader{
+		client: client,
+	}
+}
+
+func (uploader *Uploader) Close() {
+	if uploader.ionian != nil {
+		uploader.ionian.Close()
+	}
+
+	uploader.client.Close()
+}
+
+func (uploader *Uploader) Upload(filename string) error {
 	// Open file to upload
-	file, err := Open(uploader.filename)
+	file, err := Open(filename)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to open file")
 	}
@@ -120,13 +132,17 @@ func (uploader *Uploader) Upload() error {
 
 	logrus.WithField("info", info).Debug("Log entry retrieved from storage node")
 
+	if uploader.ionian == nil && info == nil {
+		return errors.New("log entry not available on storage node")
+	}
+
 	// Upload small data on blockchain directly.
 	if file.Size() <= maxDataSize {
 		if info != nil {
 			return errors.New("File already exists on Ionian network")
 		}
 
-		return uploader.uploadSmallData()
+		return uploader.uploadSmallData(filename)
 	}
 
 	if info != nil && info.Finalized {
@@ -158,8 +174,8 @@ func (uploader *Uploader) Upload() error {
 	return nil
 }
 
-func (uploader *Uploader) uploadSmallData() error {
-	content, err := ioutil.ReadFile(uploader.filename)
+func (uploader *Uploader) uploadSmallData(filename string) error {
+	content, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to read data from file")
 	}

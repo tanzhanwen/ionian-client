@@ -27,8 +27,9 @@ func upload(*cobra.Command, []string) {
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to create file uploader")
 	}
+	defer uploader.Close()
 
-	if err = uploader.Upload(); err != nil {
+	if err = uploader.Upload(uploadOpt.Filename); err != nil {
 		logrus.WithError(err).Fatal("Failed to upload file")
 	}
 }

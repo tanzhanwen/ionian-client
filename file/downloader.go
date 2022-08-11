@@ -11,8 +11,9 @@ import (
 )
 
 type DownloadOption struct {
-	UploadOption
-	Root string
+	Filename       string
+	StorageNodeURL string
+	Root           string
 }
 
 func (opt *DownloadOption) BindCommand(cmd *cobra.Command) {
@@ -27,32 +28,40 @@ func (opt *DownloadOption) BindCommand(cmd *cobra.Command) {
 }
 
 type Downloader struct {
-	opt    DownloadOption
 	client *node.Client
 }
 
-func NewDownloader(opt DownloadOption) (*Downloader, error) {
-	client, err := node.NewClient(opt.StorageNodeURL)
+func NewDownloader(storageNodeURL string) (*Downloader, error) {
+	client, err := node.NewClient(storageNodeURL)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to connect to storage node")
 	}
 
 	return &Downloader{
-		opt:    opt,
 		client: client,
 	}, nil
 }
 
-func (downloader *Downloader) Download() error {
+func NewDownloaderWithClient(client *node.Client) *Downloader {
+	return &Downloader{
+		client: client,
+	}
+}
+
+func (downloader *Downloader) Close() {
+	downloader.client.Close()
+}
+
+func (downloader *Downloader) Download(root, filename string) error {
 	// Query file info from storage node
-	hash := common.HexToHash(downloader.opt.Root)
+	hash := common.HexToHash(root)
 	info, err := downloader.client.GetFileInfo(hash)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get file size from storage node")
 	}
 
 	if info == nil {
-		return errors.Errorf("File not found %v", downloader.opt.Root)
+		return errors.Errorf("File not found %v", root)
 	}
 
 	logrus.WithField("file", info).Info("File found by root hash")
@@ -62,7 +71,7 @@ func (downloader *Downloader) Download() error {
 	}
 
 	// Check file existence before downloading
-	exists, err := downloader.checkExistence(hash)
+	exists, err := downloader.checkExistence(filename, hash)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to check file existence")
 	}
@@ -73,20 +82,20 @@ func (downloader *Downloader) Download() error {
 	}
 
 	// Download segments
-	if err = downloader.downloadFile(hash, int64(info.Tx.Size)); err != nil {
+	if err = downloader.downloadFile(filename, hash, int64(info.Tx.Size)); err != nil {
 		return errors.WithMessage(err, "Failed to download file")
 	}
 
 	// Validate the downloaded file
-	if err = downloader.validateDownloadFile(int64(info.Tx.Size)); err != nil {
+	if err = downloader.validateDownloadFile(root, filename, int64(info.Tx.Size)); err != nil {
 		return errors.WithMessage(err, "Failed to validate downloaded file")
 	}
 
 	return nil
 }
 
-func (downloader *Downloader) checkExistence(hash common.Hash) (bool, error) {
-	file, err := Open(downloader.opt.Filename)
+func (downloader *Downloader) checkExistence(filename string, hash common.Hash) (bool, error) {
+	file, err := Open(filename)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -109,8 +118,8 @@ func (downloader *Downloader) checkExistence(hash common.Hash) (bool, error) {
 	return true, errors.Errorf("file already exists without different hash")
 }
 
-func (downloader *Downloader) downloadFile(root common.Hash, size int64) error {
-	downloadingFilename := downloader.opt.Filename + ".download"
+func (downloader *Downloader) downloadFile(filename string, root common.Hash, size int64) error {
+	downloadingFilename := filename + ".download"
 
 	// TODO support to download from breakpoint
 	file, err := os.Create(downloadingFilename)
@@ -177,12 +186,12 @@ func (downloader *Downloader) downloadFile(root common.Hash, size int64) error {
 	return nil
 }
 
-func (downloader *Downloader) validateDownloadFile(fileSize int64) error {
-	if err := os.Rename(downloader.opt.Filename+".download", downloader.opt.Filename); err != nil {
+func (downloader *Downloader) validateDownloadFile(root, filename string, fileSize int64) error {
+	if err := os.Rename(filename+".download", filename); err != nil {
 		return errors.WithMessage(err, "Failed to rename file")
 	}
 
-	file, err := Open(downloader.opt.Filename)
+	file, err := Open(filename)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to open file")
 	}
@@ -197,7 +206,7 @@ func (downloader *Downloader) validateDownloadFile(fileSize int64) error {
 		return errors.WithMessage(err, "Failed to create merkle tree")
 	}
 
-	if rootHex := tree.Root().Hex(); rootHex != downloader.opt.Root {
+	if rootHex := tree.Root().Hex(); rootHex != root {
 		return errors.Errorf("Merkle root mismatch, downloaded = %v", rootHex)
 	}
 

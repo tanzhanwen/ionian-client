@@ -23,12 +23,13 @@ func init() {
 }
 
 func download(*cobra.Command, []string) {
-	downloader, err := file.NewDownloader(downloadOpt)
+	downloader, err := file.NewDownloader(downloadOpt.StorageNodeURL)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to create file downloader")
 	}
+	defer downloader.Close()
 
-	if err = downloader.Download(); err != nil {
+	if err = downloader.Download(downloadOpt.Root, downloadOpt.Filename); err != nil {
 		logrus.WithError(err).Fatal("Failed to download file")
 	}
 }
