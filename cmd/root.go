@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ionian-Web3-Storage/ionian-client/contract"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,7 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", logrus.InfoLevel.String(), "Log level")
 	rootCmd.PersistentFlags().BoolVar(&logColorForced, "log-force-color", false, "Force to output colorful logs")
+	rootCmd.PersistentFlags().Uint64Var(&contract.CustomGasPrice, "gas-price", 0, "Custom gas price to send transaction")
 }
 
 func initLog() {

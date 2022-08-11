@@ -3,6 +3,7 @@ package contract
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math/big"
 	"strings"
 	"time"
 
@@ -14,6 +15,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+var CustomGasPrice uint64
+
+func getGasPrice() *hexutil.Big {
+	if CustomGasPrice == 0 {
+		return nil
+	}
+
+	return (*hexutil.Big)(new(big.Int).SetUint64(CustomGasPrice))
+}
 
 type contract struct {
 	abi     abi.ABI
@@ -52,9 +63,10 @@ func (c *contract) send(method string, args ...interface{}) (common.Hash, error)
 	}
 
 	return c.client.Eth.SendTransactionByArgs(types.TransactionArgs{
-		From: &from,
-		To:   &c.address,
-		Data: &txInputData,
+		From:     &from,
+		To:       &c.address,
+		Data:     &txInputData,
+		GasPrice: getGasPrice(),
 	})
 }
 
@@ -103,8 +115,9 @@ func Deploy(clientWithSigner *web3go.Client, dataOrFile string) (common.Address,
 	}
 
 	txHash, err := clientWithSigner.Eth.SendTransactionByArgs(types.TransactionArgs{
-		From: &from,
-		Data: &bytecode,
+		From:     &from,
+		Data:     &bytecode,
+		GasPrice: getGasPrice(),
 	})
 	if err != nil {
 		return common.Address{}, errors.WithMessage(err, "Failed to send transaction")
