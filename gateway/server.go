@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Ionian-Web3-Storage/ionian-client/node"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/sirupsen/logrus"
@@ -42,6 +43,7 @@ func newLocalRouter() *gin.Engine {
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		router.Use(gin.Logger())
 	}
+	router.Use(middlewareCors())
 
 	localApi := router.Group("/local")
 	localApi.GET("/nodes", wrap(listNodes))
@@ -71,4 +73,13 @@ func wrap(controller func(*gin.Context) (interface{}, error)) func(*gin.Context)
 			c.JSON(http.StatusOK, ErrNil.WithData(result))
 		}
 	}
+}
+
+func middlewareCors() gin.HandlerFunc {
+	conf := cors.DefaultConfig()
+	conf.AllowMethods = append(conf.AllowMethods, "OPTIONS")
+	conf.AllowHeaders = append(conf.AllowHeaders, "*")
+	conf.AllowAllOrigins = true
+
+	return cors.New(conf)
 }

@@ -1,10 +1,14 @@
 package gateway
 
 import (
+	"path/filepath"
+
 	"github.com/Ionian-Web3-Storage/ionian-client/file"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 )
+
+var LocalFileRepo string = "."
 
 func listNodes(c *gin.Context) (interface{}, error) {
 	var nodes []string
@@ -25,7 +29,14 @@ func getLocalFileInfo(c *gin.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	file, err := file.Open(input.Path)
+	var filename string
+	if filepath.IsAbs(input.Path) {
+		filename = input.Path
+	} else {
+		filename = filepath.Join(LocalFileRepo, input.Path)
+	}
+
+	file, err := file.Open(filename)
 	if err != nil {
 		return nil, err
 	}
