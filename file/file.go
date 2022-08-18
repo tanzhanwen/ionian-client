@@ -26,12 +26,12 @@ type File struct {
 func Exists(name string) (bool, error) {
 	file, err := os.Open(name)
 	if os.IsNotExist(err) {
-		return true, nil
+		return false, nil
 	}
 
 	defer file.Close()
 
-	return false, err
+	return true, err
 }
 
 func Open(name string) (*File, error) {

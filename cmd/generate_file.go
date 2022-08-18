@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"time"
 
 	"github.com/Ionian-Web3-Storage/ionian-client/file"
 	"github.com/sirupsen/logrus"
@@ -36,19 +37,37 @@ func generateTempFile(*cobra.Command, []string) {
 		logrus.WithError(err).Fatal("Failed to check file existence")
 	}
 
-	if exists && !overwrite {
-		logrus.Warn("File already exists")
-		return
+	if exists {
+		if !overwrite {
+			logrus.Warn("File already exists")
+			return
+		}
+
+		logrus.Info("Overrite file")
 	}
 
+	rand.Seed(time.Now().UnixNano())
+
 	data := make([]byte, size)
-	if _, err = rand.Read(data); err != nil {
+	if n, err := rand.Read(data); err != nil {
 		logrus.WithError(err).Fatal("Failed to generate random data")
+	} else if n != len(data) {
+		logrus.WithField("n", n).Fatal("Invalid data len")
 	}
 
 	if err = ioutil.WriteFile(filename, data, os.ModePerm); err != nil {
 		logrus.WithError(err).Fatal("Failed to write file")
 	}
 
-	logrus.Info("Succeeded to write file")
+	file, err := file.Open(filename)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to open file")
+	}
+
+	tree, err := file.MerkleTree()
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to generate merkle tree")
+	}
+
+	logrus.WithField("root", tree.Root()).Info("Succeeded to write file")
 }
