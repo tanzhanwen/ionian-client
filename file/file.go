@@ -23,6 +23,17 @@ type File struct {
 	underlying *os.File
 }
 
+func Exists(name string) (bool, error) {
+	file, err := os.Open(name)
+	if os.IsNotExist(err) {
+		return true, nil
+	}
+
+	defer file.Close()
+
+	return false, err
+}
+
 func Open(name string) (*File, error) {
 	file, err := os.Open(name)
 	if err != nil {

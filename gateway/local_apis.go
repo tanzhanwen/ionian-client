@@ -20,6 +20,18 @@ func listNodes(c *gin.Context) (interface{}, error) {
 	return nodes, nil
 }
 
+func getFilePath(path string, download bool) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+
+	if !download {
+		return filepath.Join(LocalFileRepo, path)
+	}
+
+	return filepath.Join(LocalFileRepo, "download", path)
+}
+
 func getLocalFileInfo(c *gin.Context) (interface{}, error) {
 	var input struct {
 		Path string `form:"path" json:"path" binding:"required"`
@@ -29,12 +41,7 @@ func getLocalFileInfo(c *gin.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	var filename string
-	if filepath.IsAbs(input.Path) {
-		filename = input.Path
-	} else {
-		filename = filepath.Join(LocalFileRepo, input.Path)
-	}
+	filename := getFilePath(input.Path, false)
 
 	file, err := file.Open(filename)
 	if err != nil {
@@ -107,7 +114,9 @@ func uploadLocalFile(c *gin.Context) (interface{}, error) {
 
 	uploader := file.NewUploaderLight(allClients[input.Node])
 
-	if err := uploader.Upload(input.Path); err != nil {
+	filename := getFilePath(input.Path, false)
+
+	if err := uploader.Upload(filename); err != nil {
 		return nil, err
 	}
 
@@ -131,7 +140,9 @@ func downloadFileLocal(c *gin.Context) (interface{}, error) {
 
 	downloader := file.NewDownloaderWithClient(allClients[input.Node])
 
-	if err := downloader.Download(input.Root, input.Path); err != nil {
+	filename := getFilePath(input.Path, true)
+
+	if err := downloader.Download(input.Root, filename); err != nil {
 		return nil, err
 	}
 
