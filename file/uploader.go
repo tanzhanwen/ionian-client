@@ -1,8 +1,6 @@
 package file
 
 import (
-	"io/ioutil"
-	"math/big"
 	"time"
 
 	"github.com/Ionian-Web3-Storage/ionian-client/contract"
@@ -18,7 +16,7 @@ import (
 )
 
 // maxDataSize is the maximum data size to upload on blockchain directly.
-const maxDataSize = int64(4 * 1024)
+// const maxDataSize = int64(4 * 1024)
 
 type UploadOption struct {
 	Filename string
@@ -45,7 +43,7 @@ func (opt *UploadOption) BindCommand(cmd *cobra.Command) {
 	cmd.MarkFlagRequired("node")
 }
 
-func (opt *UploadOption) NewIonian() (*contract.Ionian, error) {
+func (opt *UploadOption) NewIonian() (*contract.Flow, error) {
 	sm := signers.MustNewSignerManagerByPrivateKeyStrings([]string{opt.PrivateKey})
 
 	option := new(web3go.ClientOption).
@@ -60,11 +58,11 @@ func (opt *UploadOption) NewIonian() (*contract.Ionian, error) {
 
 	addr := common.HexToAddress(opt.FullnodeContract)
 
-	return contract.MustNewIonian(addr, client), nil
+	return contract.MustNewFlow(addr, client), nil
 }
 
 type Uploader struct {
-	ionian *contract.Ionian
+	ionian *contract.Flow
 	client *node.Client
 }
 
@@ -137,13 +135,13 @@ func (uploader *Uploader) Upload(filename string) error {
 	}
 
 	// Upload small data on blockchain directly.
-	if file.Size() <= maxDataSize {
-		if info != nil {
-			return errors.New("File already exists on Ionian network")
-		}
+	// if file.Size() <= maxDataSize {
+	// 	if info != nil {
+	// 		return errors.New("File already exists on Ionian network")
+	// 	}
 
-		return uploader.uploadSmallData(filename)
-	}
+	// 	return uploader.uploadSmallData(filename)
+	// }
 
 	if info != nil && info.Finalized {
 		return errors.New("File already exists on Ionian network")
@@ -174,21 +172,21 @@ func (uploader *Uploader) Upload(filename string) error {
 	return nil
 }
 
-func (uploader *Uploader) uploadSmallData(filename string) error {
-	content, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to read data from file")
-	}
+// func (uploader *Uploader) uploadSmallData(filename string) error {
+// 	content, err := ioutil.ReadFile(filename)
+// 	if err != nil {
+// 		return errors.WithMessage(err, "Failed to read data from file")
+// 	}
 
-	hash, err := uploader.ionian.AppendLogWithData(content)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to send transaction to append log with data")
-	}
+// 	hash, err := uploader.ionian.AppendLogWithData(content)
+// 	if err != nil {
+// 		return errors.WithMessage(err, "Failed to send transaction to append log with data")
+// 	}
 
-	logrus.WithField("hash", hash.Hex()).Info("Succeeded to send transaction to append log with data")
+// 	logrus.WithField("hash", hash.Hex()).Info("Succeeded to send transaction to append log with data")
 
-	return uploader.waitForSuccessfulExecution(hash)
-}
+// 	return uploader.waitForSuccessfulExecution(hash)
+// }
 
 func (uploader *Uploader) waitForSuccessfulExecution(txHash common.Hash) error {
 	logrus.WithField("tx", txHash).Info("Wait for transaction execution")
@@ -217,8 +215,14 @@ func (uploader *Uploader) waitForSuccessfulExecution(txHash common.Hash) error {
 }
 
 func (uploader *Uploader) submitLogEntry(file *File, tree *merkle.Tree) error {
+	flow := NewFlow(file)
+	submission, err := flow.CreateSubmission()
+	if err != nil {
+		return errors.WithMessage(err, "Failed to create flow submission")
+	}
+
 	// Submit log entry to smart contract.
-	hash, err := uploader.ionian.AppendLog(tree.Root(), big.NewInt(file.Size()))
+	hash, err := uploader.ionian.Submit(*submission)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to send transaction to append log entry")
 	}
@@ -253,6 +257,7 @@ func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 	logrus.Info("Begin to upload file")
 
 	iter := file.Iterate()
+	var segIndex int
 
 	for {
 		ok, err := iter.Next()
@@ -265,12 +270,12 @@ func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 		}
 
 		segment := iter.Current()
-		proof := tree.ProofAt(int(segment.Index))
+		proof := tree.ProofAt(segIndex)
 
 		segWithProof := node.SegmentWithProof{
 			Root:  tree.Root(),
-			Data:  segment.Data,
-			Index: uint32(segment.Index),
+			Data:  segment,
+			Index: uint32(segIndex),
 			Proof: proof,
 		}
 
@@ -279,14 +284,17 @@ func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 		}
 
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			chunkIndex := segIndex * DefaultSegmentMaxChunks
 			logrus.WithFields(logrus.Fields{
 				"total":      file.NumSegments(),
-				"index":      segment.Index,
-				"chunkStart": segment.ChunkIndex,
-				"chunkEnd":   int(segment.ChunkIndex) + len(segment.Data)/DefaultChunkSize,
-				"root":       segment.Root(),
+				"index":      segIndex,
+				"chunkStart": chunkIndex,
+				"chunkEnd":   chunkIndex + len(segment)/DefaultChunkSize,
+				"root":       segmentRoot(segment),
 			}).Debug("Segment uploaded")
 		}
+
+		segIndex++
 	}
 
 	logrus.Info("Completed to upload file")

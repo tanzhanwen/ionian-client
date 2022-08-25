@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Ionian-Web3-Storage/ionian-client/file/merkle"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -67,12 +68,12 @@ func (file *File) NumSegments() uint32 {
 	return numSplits(file.Size(), DefaultChunkSize*DefaultSegmentMaxChunks)
 }
 
-func (file *File) Iterate() *SegmentIterator {
-	return newSegmentIterator(file.underlying)
+func (file *File) Iterate() *Iterator {
+	return NewSegmentIterator(file.underlying, 0)
 }
 
 func (file *File) MerkleTree() (*merkle.Tree, error) {
-	iter := newSegmentIterator(file.underlying)
+	iter := file.Iterate()
 	var builder merkle.TreeBuilder
 
 	for {
@@ -85,7 +86,7 @@ func (file *File) MerkleTree() (*merkle.Tree, error) {
 			break
 		}
 
-		segRoot := iter.Current().Root()
+		segRoot := segmentRoot(iter.Current())
 
 		builder.AppendHash(segRoot)
 	}
@@ -99,4 +100,20 @@ func numSplits(total int64, unit int) uint32 {
 	}
 
 	return uint32(total/int64(unit)) + 1
+}
+
+func segmentRoot(chunks []byte) common.Hash {
+	dataLen := len(chunks)
+	if dataLen == 0 {
+		return common.Hash{}
+	}
+
+	var builder merkle.TreeBuilder
+
+	for offset := 0; offset < dataLen; offset += DefaultChunkSize {
+		chunk := chunks[offset : offset+DefaultChunkSize]
+		builder.Append(chunk)
+	}
+
+	return builder.Build().Root()
 }
