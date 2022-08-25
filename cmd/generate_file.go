@@ -24,7 +24,7 @@ var (
 )
 
 func init() {
-	genFileCmd.Flags().Uint64Var(&size, "size", 4*1024*1024, "File size in bytes")
+	genFileCmd.Flags().Uint64Var(&size, "size", 0, "File size in bytes")
 	genFileCmd.Flags().StringVar(&filename, "file", "tmp123456", "File name to generate")
 	genFileCmd.Flags().BoolVar(&overwrite, "overwrite", true, "Whether to overwrite existing file")
 
@@ -47,6 +47,11 @@ func generateTempFile(*cobra.Command, []string) {
 	}
 
 	rand.Seed(time.Now().UnixNano())
+
+	if size == 0 {
+		// [1M, 10M)
+		size = 1024*1024 + uint64(9.0*1024*1024*rand.Float64())
+	}
 
 	data := make([]byte, size)
 	if n, err := rand.Read(data); err != nil {
