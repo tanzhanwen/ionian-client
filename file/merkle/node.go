@@ -17,7 +17,6 @@ type node struct {
 	left   *node
 	right  *node
 	hash   common.Hash
-	isLeft bool // left hand side of parent node, which is used for merkle proof
 }
 
 func newNode(hash common.Hash) *node {
@@ -43,4 +42,8 @@ func newInteriorNode(left, right *node) *node {
 	right.parent = node
 
 	return node
+}
+
+func (n *node) isLeftSide() bool {
+	return n.parent != nil && n.parent.left == n
 }

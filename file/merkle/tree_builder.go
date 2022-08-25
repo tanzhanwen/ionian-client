@@ -37,7 +37,6 @@ func (builder *TreeBuilder) Build() *Tree {
 		}
 
 		left, right := builder.leafNodes[i], builder.leafNodes[i+1]
-		left.isLeft = true
 
 		node := newInteriorNode(left, right)
 		queue.PushBack(node)
@@ -51,7 +50,6 @@ func (builder *TreeBuilder) Build() *Tree {
 
 		for i := 0; i < numNodes/2; i++ {
 			left := queue.Remove(queue.Front()).(*node)
-			left.isLeft = true
 			right := queue.Remove(queue.Front()).(*node)
 
 			node := newInteriorNode(left, right)

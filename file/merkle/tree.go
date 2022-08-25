@@ -33,7 +33,7 @@ func (tree *Tree) ProofAt(i int) Proof {
 	proof.Lemma = append(proof.Lemma, tree.leafNodes[i].hash)
 
 	for current := tree.leafNodes[i]; current != tree.root; current = current.parent {
-		if current.isLeft {
+		if current.isLeftSide() {
 			proof.Lemma = append(proof.Lemma, current.parent.right.hash)
 			proof.Path = append(proof.Path, true)
 		} else {
