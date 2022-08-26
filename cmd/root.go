@@ -29,6 +29,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", logrus.InfoLevel.String(), "Log level")
 	rootCmd.PersistentFlags().BoolVar(&logColorForced, "log-force-color", false, "Force to output colorful logs")
 	rootCmd.PersistentFlags().Uint64Var(&contract.CustomGasPrice, "gas-price", 0, "Custom gas price to send transaction")
+	rootCmd.PersistentFlags().Uint64Var(&contract.CustomGasLimit, "gas-limit", 0, "Custom gas limit to send transaction")
 }
 
 func initLog() {

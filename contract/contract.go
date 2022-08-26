@@ -17,6 +17,7 @@ import (
 )
 
 var CustomGasPrice uint64
+var CustomGasLimit uint64
 
 func getGasPrice() *hexutil.Big {
 	if CustomGasPrice == 0 {
@@ -24,6 +25,16 @@ func getGasPrice() *hexutil.Big {
 	}
 
 	return (*hexutil.Big)(new(big.Int).SetUint64(CustomGasPrice))
+}
+
+func getGasLimit() *hexutil.Uint64 {
+	if CustomGasLimit == 0 {
+		return nil
+	}
+
+	gas := hexutil.Uint64(CustomGasLimit)
+
+	return &gas
 }
 
 type contract struct {
@@ -67,6 +78,7 @@ func (c *contract) send(method string, args ...interface{}) (common.Hash, error)
 		To:       &c.address,
 		Data:     &txInputData,
 		GasPrice: getGasPrice(),
+		Gas:      getGasLimit(),
 	})
 }
 
@@ -118,6 +130,7 @@ func Deploy(clientWithSigner *web3go.Client, dataOrFile string) (common.Address,
 		From:     &from,
 		Data:     &bytecode,
 		GasPrice: getGasPrice(),
+		Gas:      getGasLimit(),
 	})
 	if err != nil {
 		return common.Address{}, errors.WithMessage(err, "Failed to send transaction")
