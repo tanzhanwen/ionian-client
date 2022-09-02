@@ -68,12 +68,13 @@ func (file *File) NumSegments() uint32 {
 	return numSplits(file.Size(), DefaultChunkSize*DefaultSegmentMaxChunks)
 }
 
-func (file *File) Iterate() *Iterator {
-	return NewSegmentIterator(file.underlying, 0)
+func (file *File) Iterate(flowPadding bool) *Iterator {
+	// File root and the Flow submission has different ways in file padding
+	return NewSegmentIterator(file.underlying, file.Size(), 0, flowPadding)
 }
 
 func (file *File) MerkleTree() (*merkle.Tree, error) {
-	iter := file.Iterate()
+	iter := file.Iterate(true)
 	var builder merkle.TreeBuilder
 
 	for {

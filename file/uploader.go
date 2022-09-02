@@ -256,7 +256,7 @@ func (uploader *Uploader) waitForLogEntry(root common.Hash) error {
 func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 	logrus.Info("Begin to upload file")
 
-	iter := file.Iterate()
+	iter := file.Iterate(true)
 	var segIndex int
 
 	for {

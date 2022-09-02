@@ -18,6 +18,7 @@ func NewFlow(file *File) *Flow {
 }
 
 func (flow *Flow) CreateSubmission() (*contract.Submission, error) {
+	// TODO(kevin): limit file size, e.g., 2^31
 	submission := contract.Submission{
 		Length: big.NewInt(flow.file.Size()),
 	}
@@ -35,23 +36,54 @@ func (flow *Flow) CreateSubmission() (*contract.Submission, error) {
 	return &submission, nil
 }
 
+func nextPow2(input uint32) uint64 {
+	x := uint64(input)
+	x -= 1
+	x |= x >> 16
+	x |= x >> 8
+	x |= x >> 4
+	x |= x >> 2
+	x |= x >> 1
+	x += 1
+	return x
+}
+
+func computePaddedSize(chunks uint32) (uint64, uint64) {
+	chunksNextPow2 := nextPow2(chunks)
+	if chunksNextPow2 == uint64(chunks) {
+		return chunksNextPow2, chunksNextPow2
+	}
+
+	var minChunk uint64
+	if chunksNextPow2 >= 16 {
+		minChunk = chunksNextPow2 / 16
+	} else {
+		minChunk = 1
+	}
+
+	paddedChunks := ((uint64(chunks)-1)/minChunk + 1) * minChunk
+	return paddedChunks, chunksNextPow2
+}
+
 // e.g. 64, 32, 1 in chunks
 func (flow *Flow) splitNodes() []int64 {
 	var nodes []int64
 
-	chunks := int64(flow.file.NumChunks())
+	chunks := flow.file.NumChunks()
+	paddedChunks, chunksNextPow2 := computePaddedSize(chunks)
+	nextChunkSize := chunksNextPow2
 
-	// split from right to left
-	for chunks > 0 {
-		tmp := chunks & (chunks - 1) // remove the last bit 1
-		nodes = append(nodes, chunks-tmp)
-		chunks = tmp
+	for paddedChunks > 0 {
+		if paddedChunks >= nextChunkSize {
+			paddedChunks -= nextChunkSize
+			nodes = append(nodes, int64(nextChunkSize))
+		}
+		nextChunkSize /= 2
 	}
-
-	// reverse
-	for i, j := 0, len(nodes)-1; i < j; i, j = i+1, j-1 {
-		nodes[i], nodes[j] = nodes[j], nodes[i]
-	}
+	logrus.WithFields(logrus.Fields{
+		"chunks":   chunks,
+		"nodeSize": nodes,
+	}).Debug("SplitNodes")
 
 	return nodes
 }
@@ -66,7 +98,7 @@ func (flow *Flow) createNode(offset, chunks int64) (*contract.SubmissionNode, er
 }
 
 func (flow *Flow) createSegmentNode(offset, batch, size int64) (*contract.SubmissionNode, error) {
-	iter := NewIterator(flow.file.underlying, offset, batch)
+	iter := NewIterator(flow.file.underlying, flow.file.Size(), offset, batch, true)
 	var builder merkle.TreeBuilder
 
 	for i := int64(0); i < size; {
