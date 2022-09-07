@@ -9,6 +9,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	errFileNotFound     = errors.New("File not found")
+	errFileNotFinalized = errors.New("File not finalized")
+)
+
 type Downloader struct {
 	client *node.Client
 }
@@ -22,19 +27,9 @@ func NewDownloader(client *node.Client) *Downloader {
 func (downloader *Downloader) Download(root, filename string) error {
 	// Query file info from storage node
 	hash := common.HexToHash(root)
-	info, err := downloader.client.GetFileInfo(hash)
+	info, err := downloader.queryFile(hash)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to get file size from storage node")
-	}
-
-	if info == nil {
-		return errors.Errorf("File not found %v", root)
-	}
-
-	logrus.WithField("file", info).Info("File found by root hash")
-
-	if !info.Finalized {
-		return errors.New("File not finalized yet")
+		return errors.WithMessage(err, "Failed to query file info")
 	}
 
 	// Check file existence before downloading
@@ -59,6 +54,25 @@ func (downloader *Downloader) Download(root, filename string) error {
 	}
 
 	return nil
+}
+
+func (downloader *Downloader) queryFile(root common.Hash) (*node.FileInfo, error) {
+	info, err := downloader.client.GetFileInfo(root)
+	if err != nil {
+		return nil, errors.WithMessage(err, "Failed to get file info from storage node")
+	}
+
+	if info == nil {
+		return nil, errFileNotFound
+	}
+
+	logrus.WithField("file", info).Info("File found by root hash")
+
+	if !info.Finalized {
+		return nil, errFileNotFinalized
+	}
+
+	return info, nil
 }
 
 func (downloader *Downloader) checkExistence(filename string, hash common.Hash) (bool, error) {
