@@ -56,10 +56,6 @@ func mustNewContract(abiJSON string, address common.Address, clientWithSigner *w
 	}
 }
 
-func (c *contract) Close() {
-	c.client.Close()
-}
-
 func (c *contract) send(method string, args ...interface{}) (common.Hash, error) {
 	data, err := c.abi.Pack(method, args...)
 	if err != nil {

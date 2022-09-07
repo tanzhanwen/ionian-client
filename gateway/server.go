@@ -14,18 +14,12 @@ const httpStatusInternalError = 600
 
 var allClients []*node.Client
 
-func MustServeLocal(nodes []string) {
+func MustServeLocal(nodes []*node.Client) {
 	if len(nodes) == 0 {
 		logrus.Fatal("storage nodes not configured")
 	}
 
-	for _, url := range nodes {
-		client, err := node.NewClient(url)
-		if err != nil {
-			logrus.WithError(err).WithField("url", url).Fatal("Failed to connect storage node")
-		}
-		allClients = append(allClients, client)
-	}
+	allClients = nodes
 
 	server := http.Server{
 		Addr:    "127.0.0.1:6789",

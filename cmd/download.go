@@ -2,12 +2,17 @@ package cmd
 
 import (
 	"github.com/Ionian-Web3-Storage/ionian-client/file"
+	"github.com/Ionian-Web3-Storage/ionian-client/node"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var (
-	downloadOpt file.DownloadOption
+	downloadArgs struct {
+		file string
+		node string
+		root string
+	}
 
 	downloadCmd = &cobra.Command{
 		Use:   "download",
@@ -17,19 +22,23 @@ var (
 )
 
 func init() {
-	downloadOpt.BindCommand(downloadCmd)
+	downloadCmd.Flags().StringVar(&downloadArgs.file, "file", "", "File name to download")
+	downloadCmd.MarkFlagRequired("file")
+	downloadCmd.Flags().StringVar(&downloadArgs.node, "node", "", "Ionian storage node URL")
+	downloadCmd.MarkFlagRequired("node")
+	downloadCmd.Flags().StringVar(&downloadArgs.root, "root", "", "Merkle root to download file")
+	downloadCmd.MarkFlagRequired("root")
 
 	rootCmd.AddCommand(downloadCmd)
 }
 
 func download(*cobra.Command, []string) {
-	downloader, err := file.NewDownloader(downloadOpt.StorageNodeURL)
-	if err != nil {
-		logrus.WithError(err).Fatal("Failed to create file downloader")
-	}
-	defer downloader.Close()
+	node := node.MustNewClient(downloadArgs.node)
+	defer node.Close()
 
-	if err = downloader.Download(downloadOpt.Root, downloadOpt.Filename); err != nil {
+	downloader := file.NewDownloader(node)
+
+	if err := downloader.Download(downloadArgs.root, downloadArgs.file); err != nil {
 		logrus.WithError(err).Fatal("Failed to download file")
 	}
 }

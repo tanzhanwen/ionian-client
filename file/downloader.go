@@ -7,49 +7,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
-
-type DownloadOption struct {
-	Filename       string
-	StorageNodeURL string
-	Root           string
-}
-
-func (opt *DownloadOption) BindCommand(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&opt.Filename, "file", "", "File name to download")
-	cmd.MarkFlagRequired("file")
-
-	cmd.Flags().StringVar(&opt.StorageNodeURL, "node", "", "Ionian storage node URL")
-	cmd.MarkFlagRequired("node")
-
-	cmd.Flags().StringVar(&opt.Root, "root", "", "Merkle root to download file")
-	cmd.MarkFlagRequired("root")
-}
 
 type Downloader struct {
 	client *node.Client
 }
 
-func NewDownloader(storageNodeURL string) (*Downloader, error) {
-	client, err := node.NewClient(storageNodeURL)
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to connect to storage node")
-	}
-
-	return &Downloader{
-		client: client,
-	}, nil
-}
-
-func NewDownloaderWithClient(client *node.Client) *Downloader {
+func NewDownloader(client *node.Client) *Downloader {
 	return &Downloader{
 		client: client,
 	}
-}
-
-func (downloader *Downloader) Close() {
-	downloader.client.Close()
 }
 
 func (downloader *Downloader) Download(root, filename string) error {

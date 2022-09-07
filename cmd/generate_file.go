@@ -12,9 +12,11 @@ import (
 )
 
 var (
-	size      uint64
-	filename  string
-	overwrite bool
+	genFileArgs struct {
+		size      uint64
+		file      string
+		overwrite bool
+	}
 
 	genFileCmd = &cobra.Command{
 		Use:   "gen",
@@ -24,21 +26,21 @@ var (
 )
 
 func init() {
-	genFileCmd.Flags().Uint64Var(&size, "size", 0, "File size in bytes")
-	genFileCmd.Flags().StringVar(&filename, "file", "tmp123456", "File name to generate")
-	genFileCmd.Flags().BoolVar(&overwrite, "overwrite", true, "Whether to overwrite existing file")
+	genFileCmd.Flags().Uint64Var(&genFileArgs.size, "size", 0, "File size in bytes")
+	genFileCmd.Flags().StringVar(&genFileArgs.file, "file", "tmp123456", "File name to generate")
+	genFileCmd.Flags().BoolVar(&genFileArgs.overwrite, "overwrite", true, "Whether to overwrite existing file")
 
 	rootCmd.AddCommand(genFileCmd)
 }
 
 func generateTempFile(*cobra.Command, []string) {
-	exists, err := file.Exists(filename)
+	exists, err := file.Exists(genFileArgs.file)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to check file existence")
 	}
 
 	if exists {
-		if !overwrite {
+		if !genFileArgs.overwrite {
 			logrus.Warn("File already exists")
 			return
 		}
@@ -48,23 +50,23 @@ func generateTempFile(*cobra.Command, []string) {
 
 	rand.Seed(time.Now().UnixNano())
 
-	if size == 0 {
+	if genFileArgs.size == 0 {
 		// [1M, 10M)
-		size = 1024*1024 + uint64(9.0*1024*1024*rand.Float64())
+		genFileArgs.size = 1024*1024 + uint64(9.0*1024*1024*rand.Float64())
 	}
 
-	data := make([]byte, size)
+	data := make([]byte, genFileArgs.size)
 	if n, err := rand.Read(data); err != nil {
 		logrus.WithError(err).Fatal("Failed to generate random data")
 	} else if n != len(data) {
 		logrus.WithField("n", n).Fatal("Invalid data len")
 	}
 
-	if err = ioutil.WriteFile(filename, data, os.ModePerm); err != nil {
+	if err = ioutil.WriteFile(genFileArgs.file, data, os.ModePerm); err != nil {
 		logrus.WithError(err).Fatal("Failed to write file")
 	}
 
-	file, err := file.Open(filename)
+	file, err := file.Open(genFileArgs.file)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to open file")
 	}

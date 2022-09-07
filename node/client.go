@@ -5,11 +5,21 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	providers "github.com/openweb3/go-rpc-provider/provider_wrapper"
+	"github.com/sirupsen/logrus"
 )
 
 type Client struct {
 	url string
 	*providers.MiddlewarableProvider
+}
+
+func MustNewClient(url string, option ...providers.Option) *Client {
+	client, err := NewClient(url, option...)
+	if err != nil {
+		logrus.WithError(err).WithField("url", url).Fatal("Failed to connect to storage node")
+	}
+
+	return client
 }
 
 func NewClient(url string, option ...providers.Option) (*Client, error) {
@@ -27,6 +37,17 @@ func NewClient(url string, option ...providers.Option) (*Client, error) {
 		url:                   url,
 		MiddlewarableProvider: provider,
 	}, nil
+}
+
+func MustNewClients(urls []string, option ...providers.Option) []*Client {
+	var clients []*Client
+
+	for _, url := range urls {
+		client := MustNewClient(url, option...)
+		clients = append(clients, client)
+	}
+
+	return clients
 }
 
 func (c *Client) URL() string {

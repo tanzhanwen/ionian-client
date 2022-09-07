@@ -8,93 +8,29 @@ import (
 	"github.com/Ionian-Web3-Storage/ionian-client/node"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/openweb3/web3go"
-	"github.com/openweb3/web3go/signers"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 // maxDataSize is the maximum data size to upload on blockchain directly.
 // const maxDataSize = int64(4 * 1024)
-
-type UploadOption struct {
-	Filename string
-
-	FullnodeURL      string
-	FullnodeContract string
-	PrivateKey       string
-
-	StorageNodeURL string
-}
-
-func (opt *UploadOption) BindCommand(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&opt.Filename, "file", "", "File name to upload")
-	cmd.MarkFlagRequired("file")
-
-	cmd.Flags().StringVar(&opt.FullnodeURL, "url", "", "Fullnode URL to interact with Ionian smart contract")
-	cmd.MarkFlagRequired("url")
-	cmd.Flags().StringVar(&opt.FullnodeContract, "contract", "", "Ionian smart contract to interact with")
-	cmd.MarkFlagRequired("contract")
-	cmd.Flags().StringVar(&opt.PrivateKey, "key", "", "Private key to interact with smart contract")
-	cmd.MarkFlagRequired("key")
-
-	cmd.Flags().StringVar(&opt.StorageNodeURL, "node", "", "Ionian storage node URL")
-	cmd.MarkFlagRequired("node")
-}
-
-func (opt *UploadOption) NewIonian() (*contract.Flow, error) {
-	sm := signers.MustNewSignerManagerByPrivateKeyStrings([]string{opt.PrivateKey})
-
-	option := new(web3go.ClientOption).
-		WithRetry(3, time.Second).
-		WithTimout(5 * time.Second).
-		WithSignerManager(sm)
-
-	client, err := web3go.NewClientWithOption(opt.FullnodeURL, *option)
-	if err != nil {
-		return nil, err
-	}
-
-	addr := common.HexToAddress(opt.FullnodeContract)
-
-	return contract.MustNewFlow(addr, client), nil
-}
 
 type Uploader struct {
 	ionian *contract.Flow
 	client *node.Client
 }
 
-func NewUploader(opt UploadOption) (*Uploader, error) {
-	ionian, err := opt.NewIonian()
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to connect to full node")
-	}
-
-	client, err := node.NewClient(opt.StorageNodeURL)
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to connect to storage node")
-	}
-
+func NewUploader(ionian *contract.Flow, client *node.Client) *Uploader {
 	return &Uploader{
 		ionian: ionian,
 		client: client,
-	}, nil
+	}
 }
 
 func NewUploaderLight(client *node.Client) *Uploader {
 	return &Uploader{
 		client: client,
 	}
-}
-
-func (uploader *Uploader) Close() {
-	if uploader.ionian != nil {
-		uploader.ionian.Close()
-	}
-
-	uploader.client.Close()
 }
 
 func (uploader *Uploader) Upload(filename string) error {
