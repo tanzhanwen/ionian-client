@@ -34,6 +34,7 @@ func newParallelDownader(clients []*node.Client, root common.Hash, file *os.File
 	}
 }
 
+// Download downloads segments in parallel.
 func (downloader *parallelDownloader) Download() error {
 	numNodes := len(downloader.clients)
 	bufSize := numNodes * 2
@@ -80,6 +81,7 @@ func (downloader *parallelDownloader) ParallelDo(routine, task int) (interface{}
 	return segment, err
 }
 
+// ParallelCollect implements the parallel.Interface interface.
 func (downloader *parallelDownloader) ParallelCollect(result *parallel.Result) error {
 	segment := result.Value.([]byte)
 	offset := int64(result.Task) * DefaultChunkSize * DefaultSegmentMaxChunks
