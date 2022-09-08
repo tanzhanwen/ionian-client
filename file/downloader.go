@@ -111,8 +111,8 @@ func (downloader *Downloader) downloadFile(filename string, root common.Hash, si
 
 	logrus.WithField("threads", len(downloader.clients)).Info("Begin to download file from storage node")
 
-	paralleller := newParallelDownader(downloader.clients, root, size)
-	if err = paralleller.Download(file); err != nil {
+	pd := newParallelDownader(downloader.clients, root, file, size)
+	if err = pd.Download(); err != nil {
 		return errors.WithMessage(err, "Failed to download file")
 	}
 
