@@ -9,38 +9,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	errFileNotFound     = errors.New("File not found")
-	errFileNotFinalized = errors.New("File not finalized")
-)
-
 type Downloader struct {
-	client *node.Client
+	clients []*node.Client
 }
 
-func NewDownloader(client *node.Client) *Downloader {
+func NewDownloader(clients ...*node.Client) *Downloader {
+	if len(clients) == 0 {
+		panic("storage node not specified")
+	}
+
 	return &Downloader{
-		client: client,
+		clients: clients,
 	}
 }
 
 func (downloader *Downloader) Download(root, filename string) error {
-	// Query file info from storage node
 	hash := common.HexToHash(root)
+
+	// Query file info from storage node
 	info, err := downloader.queryFile(hash)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to query file info")
 	}
 
 	// Check file existence before downloading
-	exists, err := downloader.checkExistence(filename, hash)
-	if err != nil {
+	if err = downloader.checkExistence(filename, hash); err != nil {
 		return errors.WithMessage(err, "Failed to check file existence")
-	}
-
-	if exists {
-		logrus.Info("File already exists")
-		return nil
 	}
 
 	// Download segments
@@ -56,54 +50,55 @@ func (downloader *Downloader) Download(root, filename string) error {
 	return nil
 }
 
-func (downloader *Downloader) queryFile(root common.Hash) (*node.FileInfo, error) {
-	info, err := downloader.client.GetFileInfo(root)
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to get file info from storage node")
+func (downloader *Downloader) queryFile(root common.Hash) (info *node.FileInfo, err error) {
+	// requires file finalized on all storage nodes
+	for _, v := range downloader.clients {
+		info, err = v.GetFileInfo(root)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "Failed to get file info on node %v", v.URL())
+		}
+
+		if info == nil {
+			return nil, errors.WithMessagef(err, "File not found on node %v", v.URL())
+		}
+
+		if !info.Finalized {
+			return nil, errors.WithMessagef(err, "File not finalized on node %v", v.URL())
+		}
 	}
 
-	if info == nil {
-		return nil, errFileNotFound
-	}
+	logrus.WithField("file", info).Debug("File found by root hash")
 
-	logrus.WithField("file", info).Info("File found by root hash")
-
-	if !info.Finalized {
-		return nil, errFileNotFinalized
-	}
-
-	return info, nil
+	return
 }
 
-func (downloader *Downloader) checkExistence(filename string, hash common.Hash) (bool, error) {
+func (downloader *Downloader) checkExistence(filename string, hash common.Hash) error {
 	file, err := Open(filename)
 	if os.IsNotExist(err) {
-		return false, nil
+		return nil
 	}
 
 	if err != nil {
-		return false, errors.WithMessage(err, "Failed to open file")
+		return errors.WithMessage(err, "Failed to open file")
 	}
 
 	defer file.Close()
 
 	tree, err := file.MerkleTree()
 	if err != nil {
-		return false, errors.WithMessage(err, "Failed to create file merkle tree")
+		return errors.WithMessage(err, "Failed to create file merkle tree")
 	}
 
 	if tree.Root().Hex() == hash.Hex() {
-		return true, nil
+		return errors.New("File already exists")
 	}
 
-	return true, errors.Errorf("file already exists without different hash")
+	return errors.New("File already exists with different hash")
 }
 
 func (downloader *Downloader) downloadFile(filename string, root common.Hash, size int64) error {
-	downloadingFilename := filename + ".download"
-
 	// TODO support to download from breakpoint
-	file, err := os.Create(downloadingFilename)
+	file, err := os.Create(filename + ".download")
 	if err != nil {
 		return errors.WithMessage(err, "Failed to create downloading file")
 	}
@@ -114,52 +109,11 @@ func (downloader *Downloader) downloadFile(filename string, root common.Hash, si
 		return errors.WithMessage(err, "Failed to truncate file to preserve space")
 	}
 
-	logrus.Info("Begin to download file from storage node")
+	logrus.WithField("threads", len(downloader.clients)).Info("Begin to download file from storage node")
 
-	numChunks := numSplits(size, DefaultChunkSize)
-	numSegments := numSplits(size, DefaultChunkSize*DefaultSegmentMaxChunks)
-
-	for i := uint32(0); i < numSegments; i++ {
-		startIndex := i * DefaultSegmentMaxChunks
-		endIndex := startIndex + DefaultSegmentMaxChunks
-		if endIndex > numChunks {
-			endIndex = numChunks
-		}
-
-		// TODO download with proof and validate
-		segment, err := downloader.client.DownloadSegment(root, startIndex, endIndex)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"total":           numSegments,
-				"index":           i,
-				"chunkStartIndex": startIndex,
-				"chunkEndIndex":   endIndex,
-			}).Info("Failed to download segment")
-			return errors.WithMessagef(err, "Failed to download segment")
-		}
-
-		// Handle the zero paddings for the last chunk
-		if i == numSegments-1 {
-			if lastChunkSize := size % DefaultChunkSize; lastChunkSize > 0 {
-				paddings := DefaultChunkSize - lastChunkSize
-				segment = segment[0 : len(segment)-int(paddings)]
-			}
-		}
-
-		offset := int64(i) * int64(DefaultChunkSize*DefaultSegmentMaxChunks)
-
-		if _, err := file.WriteAt(segment, offset); err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"total": numSegments,
-				"index": i,
-			}).Info("Failed to write segment to file")
-			return errors.WithMessage(err, "Failed to write segment to file")
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"total": numSegments,
-			"index": i,
-		}).Debug("Segment downloaded")
+	paralleller := newParallelDownader(downloader.clients, root, size)
+	if err = paralleller.Download(file); err != nil {
+		return errors.WithMessage(err, "Failed to download file")
 	}
 
 	logrus.Info("Completed to download file")

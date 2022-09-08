@@ -9,9 +9,9 @@ import (
 
 var (
 	downloadArgs struct {
-		file string
-		node string
-		root string
+		file  string
+		nodes []string
+		root  string
 	}
 
 	downloadCmd = &cobra.Command{
@@ -24,7 +24,7 @@ var (
 func init() {
 	downloadCmd.Flags().StringVar(&downloadArgs.file, "file", "", "File name to download")
 	downloadCmd.MarkFlagRequired("file")
-	downloadCmd.Flags().StringVar(&downloadArgs.node, "node", "", "Ionian storage node URL")
+	downloadCmd.Flags().StringSliceVar(&downloadArgs.nodes, "node", []string{}, "Ionian storage node URL")
 	downloadCmd.MarkFlagRequired("node")
 	downloadCmd.Flags().StringVar(&downloadArgs.root, "root", "", "Merkle root to download file")
 	downloadCmd.MarkFlagRequired("root")
@@ -33,10 +33,9 @@ func init() {
 }
 
 func download(*cobra.Command, []string) {
-	node := node.MustNewClient(downloadArgs.node)
-	defer node.Close()
+	nodes := node.MustNewClients(downloadArgs.nodes)
 
-	downloader := file.NewDownloader(node)
+	downloader := file.NewDownloader(nodes...)
 
 	if err := downloader.Download(downloadArgs.root, downloadArgs.file); err != nil {
 		logrus.WithError(err).Fatal("Failed to download file")
