@@ -14,6 +14,8 @@ const (
 
 	// DefaultSegmentMaxChunks represents the default maximum number of chunks within a segment.
 	DefaultSegmentMaxChunks = 1024
+
+	DefaultSegmentSize = DefaultChunkSize * DefaultSegmentMaxChunks
 )
 
 // ErrFileRequired is returned when manipulate on a folder.

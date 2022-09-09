@@ -3,6 +3,7 @@ package file
 import (
 	"os"
 
+	"github.com/Ionian-Web3-Storage/ionian-client/file/download"
 	"github.com/Ionian-Web3-Storage/ionian-client/node"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -97,23 +98,25 @@ func (downloader *Downloader) checkExistence(filename string, hash common.Hash) 
 }
 
 func (downloader *Downloader) downloadFile(filename string, root common.Hash, size int64) error {
-	// TODO support to download from breakpoint
-	file, err := os.Create(filename + ".download")
+	file, err := download.CreateDownloadingFile(filename, root, size)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to create downloading file")
 	}
 	defer file.Close()
 
-	// preserve space
-	if err = file.Truncate(size); err != nil {
-		return errors.WithMessage(err, "Failed to truncate file to preserve space")
-	}
-
 	logrus.WithField("threads", len(downloader.clients)).Info("Begin to download file from storage node")
 
-	pd := newParallelDownader(downloader.clients, root, file, size)
-	if err = pd.Download(); err != nil {
+	sd, err := NewSegmentDownloader(downloader.clients, file)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to create segment downloader")
+	}
+
+	if err = sd.Download(); err != nil {
 		return errors.WithMessage(err, "Failed to download file")
+	}
+
+	if err := file.Seal(); err != nil {
+		return errors.WithMessage(err, "Failed to seal downloading file")
 	}
 
 	logrus.Info("Completed to download file")
@@ -122,10 +125,6 @@ func (downloader *Downloader) downloadFile(filename string, root common.Hash, si
 }
 
 func (downloader *Downloader) validateDownloadFile(root, filename string, fileSize int64) error {
-	if err := os.Rename(filename+".download", filename); err != nil {
-		return errors.WithMessage(err, "Failed to rename file")
-	}
-
 	file, err := Open(filename)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to open file")

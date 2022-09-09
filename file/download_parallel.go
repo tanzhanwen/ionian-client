@@ -2,63 +2,72 @@ package file
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/Ionian-Web3-Storage/ionian-client/common/parallel"
+	"github.com/Ionian-Web3-Storage/ionian-client/file/download"
 	"github.com/Ionian-Web3-Storage/ionian-client/node"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 const minBufSize = 8
 
-type parallelDownloader struct {
-	clients  []*node.Client
-	root     common.Hash
-	file     *os.File
-	fileSize int64
+type SegmentDownloader struct {
+	clients []*node.Client
+	file    *download.DownloadingFile
 
-	numChunks   uint32
-	numSegments uint32
+	segmentOffset uint32
+	numChunks     uint32
+	numSegments   uint32
 }
 
-func newParallelDownader(clients []*node.Client, root common.Hash, file *os.File, fileSize int64) *parallelDownloader {
-	return &parallelDownloader{
-		clients:     clients,
-		root:        root,
-		file:        file,
-		fileSize:    fileSize,
-		numChunks:   numSplits(fileSize, DefaultChunkSize),
-		numSegments: numSplits(fileSize, DefaultChunkSize*DefaultSegmentMaxChunks),
+func NewSegmentDownloader(clients []*node.Client, file *download.DownloadingFile) (*SegmentDownloader, error) {
+	offset := file.Metadata().Offset
+	if offset%DefaultSegmentSize > 0 {
+		return nil, errors.Errorf("Invalid data offset in downloading file %v", offset)
 	}
+
+	fileSize := file.Metadata().Size
+
+	return &SegmentDownloader{
+		clients: clients,
+		file:    file,
+
+		segmentOffset: uint32(offset / DefaultSegmentSize),
+		numChunks:     numSplits(fileSize, DefaultChunkSize),
+		numSegments:   numSplits(fileSize, DefaultSegmentSize),
+	}, nil
 }
 
 // Download downloads segments in parallel.
-func (downloader *parallelDownloader) Download() error {
+func (downloader *SegmentDownloader) Download() error {
+	numTasks := downloader.numSegments - downloader.segmentOffset
 	numNodes := len(downloader.clients)
 	bufSize := numNodes * 2
 	if bufSize < minBufSize {
 		bufSize = minBufSize
 	}
 
-	return parallel.Serial(downloader, int(downloader.numSegments), numNodes, bufSize)
+	return parallel.Serial(downloader, int(numTasks), numNodes, bufSize)
 }
 
 // ParallelDo implements the parallel.Interface interface.
-func (downloader *parallelDownloader) ParallelDo(routine, task int) (interface{}, error) {
-	startIndex := uint32(task) * DefaultSegmentMaxChunks
+func (downloader *SegmentDownloader) ParallelDo(routine, task int) (interface{}, error) {
+	segmentIndex := downloader.segmentOffset + uint32(task)
+	startIndex := segmentIndex * DefaultSegmentMaxChunks
 	endIndex := startIndex + DefaultSegmentMaxChunks
 	if endIndex > downloader.numChunks {
 		endIndex = downloader.numChunks
 	}
 
 	// TODO download with proof and validate
-	segment, err := downloader.clients[routine].DownloadSegment(downloader.root, startIndex, endIndex)
+	root := downloader.file.Metadata().Root
+	segment, err := downloader.clients[routine].DownloadSegment(root, startIndex, endIndex)
 
 	// remove paddings for the last chunk
-	if uint32(task) == downloader.numSegments-1 && err == nil {
-		if lastChunkSize := downloader.fileSize % DefaultChunkSize; lastChunkSize > 0 {
+	if segmentIndex == downloader.numSegments-1 && err == nil {
+		fileSize := downloader.file.Metadata().Size
+		if lastChunkSize := fileSize % DefaultChunkSize; lastChunkSize > 0 {
 			paddings := DefaultChunkSize - lastChunkSize
 			segment = segment[0 : len(segment)-int(paddings)]
 		}
@@ -67,13 +76,13 @@ func (downloader *parallelDownloader) ParallelDo(routine, task int) (interface{}
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"routine": routine,
-			"segment": fmt.Sprintf("%v/%v", task, downloader.numSegments),
+			"segment": fmt.Sprintf("%v/%v", segmentIndex, downloader.numSegments),
 			"chunks":  fmt.Sprintf("[%v, %v)", startIndex, endIndex),
 		}).Error("Failed to download segment")
 	} else if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"routine": routine,
-			"segment": fmt.Sprintf("%v/%v", task, downloader.numSegments),
+			"segment": fmt.Sprintf("%v/%v", segmentIndex, downloader.numSegments),
 			"chunks":  fmt.Sprintf("[%v, %v)", startIndex, endIndex),
 		}).Trace("Succeeded to download segment")
 	}
@@ -82,19 +91,6 @@ func (downloader *parallelDownloader) ParallelDo(routine, task int) (interface{}
 }
 
 // ParallelCollect implements the parallel.Interface interface.
-func (downloader *parallelDownloader) ParallelCollect(result *parallel.Result) error {
-	segment := result.Value.([]byte)
-	offset := int64(result.Task) * DefaultChunkSize * DefaultSegmentMaxChunks
-
-	n, err := downloader.file.WriteAt(segment, offset)
-
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to write segment %v to file", result.Task)
-	}
-
-	if n != len(segment) {
-		return errors.Errorf("Failed to write segment %v to file due to length mismatch, expected = %v, actual = %v", len(segment), n)
-	}
-
-	return nil
+func (downloader *SegmentDownloader) ParallelCollect(result *parallel.Result) error {
+	return downloader.file.Write(result.Value.([]byte))
 }
