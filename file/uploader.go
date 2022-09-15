@@ -208,6 +208,20 @@ func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 		segment := iter.Current()
 		proof := tree.ProofAt(segIndex)
 
+		// Skip upload rear padding data
+		numChunks := file.NumChunks()
+		startIndex := segIndex * DefaultSegmentMaxChunks
+		allDataUploaded := false
+		if startIndex >= int(numChunks) {
+			// file real data already uploaded
+			break
+		} else if startIndex+len(segment)/DefaultChunkSize >= int(numChunks) {
+			// last segment has real data
+			expectedLen := DefaultChunkSize * (int(numChunks) - startIndex)
+			segment = segment[:expectedLen]
+			allDataUploaded = true
+		}
+
 		segWithProof := node.SegmentWithProof{
 			Root:  tree.Root(),
 			Data:  segment,
@@ -228,6 +242,10 @@ func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 				"chunkEnd":   chunkIndex + len(segment)/DefaultChunkSize,
 				"root":       segmentRoot(segment),
 			}).Debug("Segment uploaded")
+		}
+
+		if allDataUploaded {
+			break
 		}
 
 		segIndex++
