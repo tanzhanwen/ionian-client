@@ -223,10 +223,11 @@ func (uploader *Uploader) uploadFile(file *File, tree *merkle.Tree) error {
 		}
 
 		segWithProof := node.SegmentWithProof{
-			Root:  tree.Root(),
-			Data:  segment,
-			Index: uint32(segIndex),
-			Proof: proof,
+			Root:     tree.Root(),
+			Data:     segment,
+			Index:    uint32(segIndex),
+			Proof:    proof,
+			FileSize: uint64(file.Size()),
 		}
 
 		if _, err = uploader.client.UploadSegment(segWithProof); err != nil {
