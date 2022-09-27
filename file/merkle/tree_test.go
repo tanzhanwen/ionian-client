@@ -24,9 +24,9 @@ func createTreeByChunks(chunks int) *Tree {
 }
 
 func TestTreeRoot(t *testing.T) {
-	assert.Equal(t, "0xfd48c947d9e6ed7b4a0be6ccbe715f2a48066bcf74ddefd52e121603c0a87467", createTreeByChunks(5).Root().Hex())
-	assert.Equal(t, "0xc285fe3cecd983801bf9a6bdaceb1d5d2cab01e215f66b250573f0780b78994d", createTreeByChunks(6).Root().Hex())
-	assert.Equal(t, "0x6209117e41910bb511f4c21198f34703d90129d67ccf0ac22c9b08a3358045a1", createTreeByChunks(7).Root().Hex())
+	assert.Equal(t, "0x2dea03c693750777940bcd0cc3f5d93543c075fa3b9a07b9fd86ec8fbaf6a8b2", createTreeByChunks(5).Root().Hex())
+	assert.Equal(t, "0x318c92000aefba6ebf570a8a6daa57aa643f04350ffbe583999ddd9e24ceb147", createTreeByChunks(6).Root().Hex())
+	assert.Equal(t, "0xca80116fb7fb8d6ef4a47e322f22e94ae8beb03e6fcbf8ab59c4d6f54fe42c4d", createTreeByChunks(7).Root().Hex())
 }
 
 func TestTreeProof(t *testing.T) {

@@ -48,7 +48,7 @@ func (proof *Proof) validateFormat() error {
 }
 
 func (proof *Proof) Validate(root common.Hash, content []byte, position uint32, numLeafNodes uint32) error {
-	contentHash := crypto.Keccak256Hash([]byte{prefixLeaf}, content)
+	contentHash := crypto.Keccak256Hash(content)
 	return proof.ValidateHash(root, contentHash, position, numLeafNodes)
 }
 
@@ -103,9 +103,9 @@ func (proof *Proof) validateRoot() bool {
 
 	for i, isLeft := range proof.Path {
 		if isLeft {
-			hash = crypto.Keccak256Hash([]byte{prefixInterior}, hash.Bytes(), proof.Lemma[i+1].Bytes())
+			hash = crypto.Keccak256Hash(hash.Bytes(), proof.Lemma[i+1].Bytes())
 		} else {
-			hash = crypto.Keccak256Hash([]byte{prefixInterior}, proof.Lemma[i+1].Bytes(), hash.Bytes())
+			hash = crypto.Keccak256Hash(proof.Lemma[i+1].Bytes(), hash.Bytes())
 		}
 	}
 

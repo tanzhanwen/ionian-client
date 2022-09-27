@@ -5,12 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const (
-	// To prevent second preimage attack
-	prefixLeaf     = byte(0)
-	prefixInterior = byte(1)
-)
-
 // Binary merkle tree node
 type node struct {
 	parent *node
@@ -27,7 +21,7 @@ func newNode(hash common.Hash) *node {
 
 func newLeafNode(content []byte) *node {
 	return &node{
-		hash: crypto.Keccak256Hash([]byte{prefixLeaf}, content),
+		hash: crypto.Keccak256Hash(content),
 	}
 }
 
@@ -35,7 +29,7 @@ func newInteriorNode(left, right *node) *node {
 	node := &node{
 		left:  left,
 		right: right,
-		hash:  crypto.Keccak256Hash([]byte{prefixInterior}, left.hash.Bytes(), right.hash.Bytes()),
+		hash:  crypto.Keccak256Hash(left.hash.Bytes(), right.hash.Bytes()),
 	}
 
 	left.parent = node
