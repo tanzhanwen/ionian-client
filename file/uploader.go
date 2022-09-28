@@ -33,7 +33,7 @@ func NewUploaderLight(client *node.Client) *Uploader {
 	}
 }
 
-func (uploader *Uploader) Upload(filename string) error {
+func (uploader *Uploader) Upload(filename string, tags string) error {
 	// Open file to upload
 	file, err := Open(filename)
 	if err != nil {
@@ -85,7 +85,7 @@ func (uploader *Uploader) Upload(filename string) error {
 
 	if info == nil {
 		// Append log on blockchain
-		if err = uploader.submitLogEntry(file, tree); err != nil {
+		if err = uploader.submitLogEntry(file, tags, tree); err != nil {
 			return errors.WithMessage(err, "Failed to submit log entry")
 		}
 
@@ -150,8 +150,11 @@ func (uploader *Uploader) waitForSuccessfulExecution(txHash common.Hash) error {
 	}
 }
 
-func (uploader *Uploader) submitLogEntry(file *File, tree *merkle.Tree) error {
-	flow := NewFlow(file)
+func (uploader *Uploader) submitLogEntry(file *File, tags string, tree *merkle.Tree) error {
+	flow, err := NewFlow(file, tags)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to create flow")
+	}
 	submission, err := flow.CreateSubmission()
 	if err != nil {
 		return errors.WithMessage(err, "Failed to create flow submission")

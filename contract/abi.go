@@ -238,36 +238,41 @@ const abiFlow = `[
   },
   {
     "inputs": [
-      {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "length",
-            "type": "uint256"
-          },
-          {
-            "components": [
-              {
-                "internalType": "bytes32",
-                "name": "root",
-                "type": "bytes32"
-              },
-              {
-                "internalType": "uint256",
-                "name": "height",
-                "type": "uint256"
-              }
-            ],
-            "internalType": "struct IonianSubmissionNode[]",
-            "name": "nodes",
-            "type": "tuple[]"
-          }
-        ],
-        "internalType": "struct IonianSubmission",
-        "name": "submission",
-        "type": "tuple"
-      }
-    ],
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "length",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes",
+              "name": "tags",
+              "type": "bytes"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "bytes32",
+                  "name": "root",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "height",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct IonianSubmissionNode[]",
+              "name": "nodes",
+              "type": "tuple[]"
+            }
+          ],
+          "internalType": "struct IonianSubmission",
+          "name": "submission",
+          "type": "tuple"
+        }
+      ],
     "name": "submit",
     "outputs": [
       {

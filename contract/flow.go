@@ -29,6 +29,7 @@ type SubmissionNode struct {
 
 type Submission struct {
 	Length *big.Int // file size
+	Tags   []byte
 	Nodes  []SubmissionNode
 }
 

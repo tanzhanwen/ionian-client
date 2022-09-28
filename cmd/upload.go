@@ -13,6 +13,7 @@ import (
 var (
 	uploadArgs struct {
 		file string
+		tags string
 
 		url      string
 		contract string
@@ -31,6 +32,7 @@ var (
 func init() {
 	uploadCmd.Flags().StringVar(&uploadArgs.file, "file", "", "File name to upload")
 	uploadCmd.MarkFlagRequired("file")
+	uploadCmd.Flags().StringVar(&uploadArgs.tags, "tags", "0x", "Tags of the file")
 
 	uploadCmd.Flags().StringVar(&uploadArgs.url, "url", "", "Fullnode URL to interact with Ionian smart contract")
 	uploadCmd.MarkFlagRequired("url")
@@ -55,8 +57,8 @@ func upload(*cobra.Command, []string) {
 	defer node.Close()
 
 	uploader := file.NewUploader(ionian, node)
-
-	if err := uploader.Upload(uploadArgs.file); err != nil {
+	
+	if err := uploader.Upload(uploadArgs.file, uploadArgs.tags); err != nil {
 		logrus.WithError(err).Fatal("Failed to upload file")
 	}
 }

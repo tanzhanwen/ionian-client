@@ -6,21 +6,28 @@ import (
 
 	"github.com/Ionian-Web3-Storage/ionian-client/contract"
 	"github.com/Ionian-Web3-Storage/ionian-client/file/merkle"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/sirupsen/logrus"
 )
 
 type Flow struct {
 	file *File
+	tags []byte
 }
 
-func NewFlow(file *File) *Flow {
-	return &Flow{file}
+func NewFlow(file *File, tags string) (*Flow, error) {
+	tagsInBytes, err := hexutil.Decode(tags)
+	if err != nil {
+		return nil, err
+	}
+	return &Flow{file: file, tags: tagsInBytes}, nil
 }
 
 func (flow *Flow) CreateSubmission() (*contract.Submission, error) {
 	// TODO(kevin): limit file size, e.g., 2^31
 	submission := contract.Submission{
 		Length: big.NewInt(flow.file.Size()),
+		Tags:   flow.tags,
 	}
 
 	var offset int64
